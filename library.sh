@@ -1,0 +1,40 @@
+#!/bin/bash
+# Сценарий тестирования библиотеки
+# Сначала подключить (прочитать) файл library.sh.
+. library.sh
+initializeANSI # Настроить управляющие ANSI-последовательности.
+# Проверить функцию validint.
+echon "First off, do you have echo in your path? (1=yes, 2=no) "
+read answer
+while ! validint $answer 1 2 ; do
+ echon "${boldon}Try again${boldoff}. Do you have echo "
+ echon "in your path? (1=yes, 2=no) "
+ read answer
+done
+
+# Проверить работу функции поиска команды в списке путей.
+if ! checkForCmdInPath "echo" ; then
+ echo "Nope, can't find the echo command."
+else
+ echo "The echo command is in the PATH."
+fi
+
+echo ""
+echon "Enter a year you think might be a leap year: "
+read year
+
+# Убедиться, что значение года находится в диапазоне между 1 и 9999,
+# с помощью validint, передав ей минимальное и максимальное значения.
+while ! validint $year 1 9999 ; do
+ echon "Please enter a year in the ${boldon}correct${boldoff} format: "
+ read year
+done
+
+# Проверить, является ли год високосным.
+if isLeapYear $year ; then
+ echo "${greenf}You're right! $year is a leap year.${reset}"
+else
+ echo "${redf}Nope, that's not a leap year.${reset}"
+fi
+ 
+exit 0
