@@ -1,0 +1,56 @@
+#!/bin/bash
+
+# newrm -- замена существующей команды rm.
+# Этот сценарий предоставляет простую возможность восстановления, создавая и
+# используя новый каталог в домашнем каталоге пользователя. Может обрабатывать
+# каталоги и отдельные файлы. Если пользователь добавляет флаг -f, файлы
+# удаляются БЕЗ архивирования.
+# Важное предупреждение: возможно, вам понадобится создать задание для cron или
+# нечто подобное для очистки удаленных каталогов и файлов через некоторое
+# время. Иначе файлы не будут удаляться из системы и вы рискуете исчерпать
+# дисковое пространство!
+
+archivedir="$HOME/.deleted-files"
+realrm="$(which rm)"
+copy="$(which cp) -R"
+
+if [ $# -eq 0 ] ; then # Позволить 'rm’ вывести сообщение о порядке использования.
+    exec $realrm # Our shell is replaced by /bin/rm.
+fi
+
+# Проверить все параметры на наличие флага '-f’
+
+flags=""
+
+while getopts "dfiPRrvW" opt
+do
+    case $opt in
+     f ) xec $realrm "$@" ;;        # exec позволяет покинуть сценарий немедленно.
+     * ) flags="$flags -$opt" ;;    # Другие флаги предназначены команде rm.
+    esac
+done
+shift $(( $OPTIND - 1 ))
+
+# НАЧАЛО ОСНОВНОГО СЦЕНАРИЯ
+# =================
+
+if [ ! -d $archivedir] ; then
+    if [ ! -w $HOME ] ; then
+        echo "$0 failed: can't create $archivedir in $HOME" >&2
+        exit 1
+    fi
+    mkdir $archivedir
+    chmod 700 $archivedir # Ограничить доступ к каталогу.
+fi
+
+for arg
+do
+    newname="$archivedir/$(date "+%S.%M.%H.%d.%m").$(basename "$arg")"
+    if [ -f "$arg" -o -d "$arg" ] ; then
+        $copy "$arg" "$newname"
+    fi
+done
+exec $realrm $flags "$@" # Текущий сценарий будет вытеснен командой realrm.
+
+
+
