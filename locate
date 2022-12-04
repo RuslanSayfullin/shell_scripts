@@ -1,0 +1,4 @@
+#!/bin/sh
+# locate -- выполняет поиск в базе данных по заданному шаблону
+locatedb="/var/locate.db"
+exec grep -i "$@" $locatedb

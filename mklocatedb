@@ -1,0 +1,17 @@
+#!/bin/bash
+# mklocatedb -- создает базу данных для locate с использованием find.
+# Для запуска этого сценария пользователь должен обладать привилегиями
+# суперпользователя root.
+
+locatedb="/var/locate.db"
+
+if [ "$(whoami)" != "root" ] ; then
+    echo "Must be root to run this command." >&2
+    exit 1
+fi
+
+find / -print > $locatedb
+
+exit 0
+
+
