@@ -1,0 +1,22 @@
+#!/bin/bash
+
+# remindme -- ищет в файле с данными совпадения с заданным шаблоном или, если
+# запускается без аргументов, выводит все содержимое файла
+
+rememberfile="$HOME/.remember"
+if [ ! -f $rememberfile ] ; then
+    echo "$0: You don't seem to have a .remember file. " >&2
+    echo "To remedy this, please use 'remember' to add reminders" >&2
+    exit
+fi
+
+if [ $# -eq 0 ] ; then
+    # Вывести все содержимое rememberfile, если критерии поиска не заданы.
+    more $rememberfile
+else
+    # Иначе выполнить поиск в файле по заданному критерию и вывести
+    # результаты.
+    grep -i -- "$@" $rememberfile | ${PAGER:-more}
+fi
+
+exit 0

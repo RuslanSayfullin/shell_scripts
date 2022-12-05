@@ -1,0 +1,15 @@
+#!/bin/bash
+
+# remember -- простой блокнот для записи заметок из командной строки
+
+rememberfile="$HOME/.remember"
+if [ $# -eq 0 ] ; then
+    # Предложить пользователю ввести заметку и добавить ее в конец
+    # файла rememberfile.
+    echo "Enter note, end with ^D: "
+    cat - >> $rememberfile
+else
+    # Записать в конец файла .remember все полученные аргументы.
+    echo "$@" >> $rememberfile
+fi
+exit 0
