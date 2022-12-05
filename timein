@@ -1,0 +1,86 @@
+#!/bin/bash
+
+# timein -- выводит текущее время в указанном часовом поясе или
+# географической области. При вызове без аргументов выводит время
+# UTC/GMT. Используйте слово "list", чтобы вывести список всех известных
+# географических областей.
+# Обратите внимание, что сценарий может находить совпадения с каталогами
+# часовых поясов (областей), но действительными спецификациями являются
+# только файлы (города).
+# Ссылка на базу данных часовых поясов: http://www.twinsun.com/tz/tz-link.htm
+
+zonedir="/usr/share/zoneinfo"
+
+if [ ! -d $zonedir ] ; then
+    echo "No time zone database at $zonedir." >&2
+    exit 1
+fi
+
+if [ -d "$zonedir/posix" ] ; then
+    zonedir=$zonedir/posix # Modern Linux systems
+fi
+
+if [ $# -eq 0 ] ; then
+    timezone="UTC"
+    mixedzone="UTC"
+elif [ "$1" = "list" ] ; then
+    ( echo "All known time zones and regions defined on this system:"
+        cd $zonedir
+        find -L * -type f -print | xargs -n 2 | \
+            awk '{ printf " %-38s %-38s\n", $1, $2 }'
+    ) | more
+    exit 0
+else
+    region="$(dirname $1)"
+    zone="$(basename $1)"
+    # Заданный часовой пояс имеет прямое соответствие? Если да, можно продолжать
+
+    # Иначе следует продолжить поиск. Для начала подсчитать совпадения.
+    matchcnt="$(find -L $zonedir -name $zone -type f -print |
+        wc -l | sed 's/[^[:digit:]]//g' )"
+
+    # Проверить наличие хотя бы одного совпадения.
+    if [ "$matchcnt" -gt 0 ] ; then
+         # И выйти, если совпадений несколько.
+         if [ $matchcnt -gt 1 ] ; then
+             echo "\"$zone\" matches more than one possible time zone record." >&2
+             echo "Please use 'list' to see all known regions and time zones." >&2
+             exit 1
+         fi
+         match="$(find -L $zonedir -name $zone -type f -print)"
+         mixedzone="$zone"
+     else # Может быть, удастся найти совпадение с регионом, а не
+         # с конкретным часовым поясом.
+         # Первый символ в названии области/пояса преобразовать в верхний
+         # регистр, остальные -- в нижний
+         mixedregion="$(echo ${region%${region#?}} \
+                      | tr '[[:lower:]]' '[[:upper:]]')\
+                      $(echo ${region#?} | tr '[[:upper:]]' '[[:lower:]]')"
+         mixedzone="$(echo ${zone%${zone#?}} | tr '[[:lower:]]' '[[:upper:]]') \
+                    $(echo ${zone#?} | tr '[[:upper:]]' '[[:lower:]]')"
+         if [ "$mixedregion" != "." ] ; then
+             # Искать только указанный часовой пояс в заданной области,
+             # чтобы позволить пользователям указывать уникальные пары, когда
+             # возможны другие варианты (например, "Atlantic").
+             match="$(find -L $zonedir/$mixedregion -type f -name $mixedzone -print)"
+        else
+            match="$(find -L $zonedir -name $mixedzone -type f -print)"
+        fi
+
+        # Если найден файл, точно соответствующий заданному шаблону
+        if [ -z "$match" ] ; then
+            # Проверить, не является ли шаблон слишком неоднозначным.
+            if [ ! -z $(find -L $zonedir -name $mixedzone -type d -print) ] ; then
+                echo "The region \"$1\" has more than one time zone. " >&2
+            else # Или полное отсутствие совпадений
+                echo "Can't find an exact match for \"$1\". " >&2
+            fi
+           echo "Please use 'list' to see all known regions and time zones." >&2
+           exit 1
+        fi
+    fi
+    timezone="$match"
+fi
+nicetz=$(echo $timezone | sed "s|$zonedir/||g") # Отформатировать вывод.
+echo It\'s $(TZ=$timezone date '+%A, %B %e, %Y, at %l:%M %p') in $nicetz
+exit 0
