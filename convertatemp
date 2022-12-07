@@ -1,0 +1,48 @@
+#!/bin/bash
+# convertatemp -- сценарий преобразования температуры, позволяющий вводить
+# температуру в градусах Фаренгейта, Цельсия или Кельвина и получать
+# эквивалентную температуру в двух других шкалах
+
+if [ $# -eq 0 ] ; then
+    cat << EOF >&2
+Usage: $0 temperature[F|C|K]
+where the suffix:
+    F    indicates input is in Fahrenheit (default)
+    C    indicates input is in Celsius
+    K    indicates input is in Kelvin
+EOF
+    exit 1
+fi
+unit="$(echo $1|sed -e 's/[-[:digit:]]*//g' | tr '[:lower:]' '[:upper:]' )"
+temp="$(echo $1|sed -e 's/[^-[:digit:]]*//g')"
+
+case ${unit:=F}
+in
+F ) # Градусы Фаренгейта в градусы Цельсия: Tc = (F - 32) / 1.8
+    farn="$temp"
+    cels="$(echo "scale=2;($farn - 32) / 1.8" | bc)"
+    kelv="$(echo "scale=2;$cels + 273.15" | bc)"
+    ;;
+C ) # Градусы Цельсия в градусы Фаренгейта: Tf = (9/5)*Tc+32
+    cels=$temp
+    kelv="$(echo "scale=2;$cels + 273.15" | bc)"
+    farn="$(echo "scale=2;(1.8 * $cels) + 32" | bc)"
+    ;;
+K ) # Градусы Цельсия = Kelvin - 273.15,
+    #  затем использовать формулу градусы Цельсия -> градусы Фаренгейта
+    kelv=$temp
+    cels="$(echo "scale=2; $kelv - 273.15" | bc)"
+    farn="$(echo "scale=2; (1.8 * $cels) + 32" | bc)"
+    ;;
+    
+    *)
+    echo "Given temperature unit is not supported"
+    exit 1
+esac
+
+echo "Fahrenheit = $farn"
+echo "Celsius = $cels"
+echo "Kelvin = $kelv"
+
+exit 0
+
