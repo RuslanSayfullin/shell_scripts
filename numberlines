@@ -1,0 +1,13 @@
+#!/bin/bash
+# numberlines -- простая альтернатива команде cat -n и др.
+for filename in "$@"
+do
+    linecount="1"
+    while IFS="\n" read line
+    do
+        echo "${linecount}: $line"
+        linecount="$(( $linecount + 1 ))"
+    done < $filename
+done
+
+exit 0
