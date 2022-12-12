@@ -1,0 +1,60 @@
+#!/bin/bash
+
+# zcat, zmore и zgrep -- сценарию следует присвоить три имени
+# с помощью символических или жестких ссылок. Это позволит прозрачно
+# работать со сжатыми файлами.
+
+Z="compress"; unZ="uncompress" ; Zlist=""
+gz="gzip"   ; ungz="gunzip"    ; gzlist=""
+bz="bzip2"  ; unbz="bunzip2"   ; bzlist=""
+
+# Первый шаг: попытаться изолировать имена файлов в командной строке.
+# Сделаем это последовательно, перебирая аргументы по одному и проверяя,
+# являются ли они именами файлов. Если очередное имя соответствует файлу и имеет
+# расширение, характеризующее программу сжатия, распакуем файл, запишем имя
+# файла и повторим итерацию.
+# По окончании повторно сожмем все, что было распаковано.
+
+for arg
+do
+    if [ -f "$arg" ] ; then
+        case "$arg" in
+            *.Z) $unZ "$arg"
+                arg="$(echo $arg | sed 's/\.Z$//')"
+                Zlist="$Zlist \"$arg\""
+                ;;
+           *.gz) $ungz "$arg"
+               arg="$(echo $arg | sed 's/\.gz$//')"
+               gzlist="$gzlist \"$arg\""
+                ;;
+          *.bz2) $unbz "$arg"
+               arg="$(echo $arg | sed 's/\.bz2$//')"
+               bzlist="$bzlist \"$arg\""
+                ;;
+       esac
+    fi
+    newargs="${newargs:-""} \"$arg\""
+done
+
+case $0 in
+    *zcat* ) eval cat $newargs    ;;
+    *zmore* ) eval more $newargs  ;;
+    *zgrep* ) eval grep $newargs  ;;
+        * ) echo "$0: unknown base name. Can't proceed." >&2
+            exit 1
+esac
+
+# Теперь сожмем все.
+if [ ! -z "$Zlist" ] ; then
+    eval $Z $Zlist
+fi
+if [ ! -z "$gzlist"] ; then
+   eval $gz $gzlist
+fi
+if [ ! -z "$bzlist" ] ; then 
+    eval $bz $bzlist
+fi
+
+# Вот и все!
+exit 0
+
