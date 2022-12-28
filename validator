@@ -1,0 +1,73 @@
+#!/bin/bash
+# validator -- проверяет допустимость каталогов в переменной PATH
+# и затем проверяет допустимость всех остальных переменных окружения.
+# Проверяются переменные SHELL, HOME, PATH, EDITOR, MAIL и PAGER.
+
+errors=0
+
+source library.sh # Содержит сценарий #1 с функцией in_path().
+validate()
+{
+    varname=$1
+    varvalue=$2
+
+    if [ ! -z $varvalue ] ; then
+        if [ "${varvalue%${varvalue#?}}" = "/" ] ; then
+            if [ ! -x $varvalue ] ; then
+                echo "** $varname set to $varvalue, but I cannot find executable."
+                (( errors++ ))
+            fi
+        else
+            if in_path $varvalue $PATH ; then
+                echo "** $varname set to $varvalue, but I cannot find it in PATH."
+                errors=$(( $errors + 1 ))
+            fi
+        fi
+    fi
+}
+
+# НАЧАЛО ОСНОВНОГО СЦЕНАРИЯ
+# =================
+
+if [ ! -x ${SHELL:?"Cannot proceed without SHELL being defined."} ] ; then
+    echo "** SHELL set to $SHELL, but I cannot find that executable."
+    errors=$(( $errors + 1 ))
+fi
+
+if [ ! -d ${HOME:?"You need to have your HOME set to your home directory"} ]
+then
+    echo "** HOME set to $HOME, but it's not a directory."
+    errors=$(( $errors + 1 ))
+fi
+
+# Первая интересная проверка: все каталоги в PATH допустимы?
+oldIFS=$IFS; IFS=":" # IFS -- разделитель полей. Записать в него ':'.
+
+for directory in $PATH
+do
+    if [ ! -d $directory ] ; then
+        echo "** PATH contains invalid directory $directory."
+        errors=$(( $errors + 1 ))
+    fi
+done
+
+IFS=$oldIFS # Восстановить прежнее значение разделителя полей.
+# Следующие переменные должны содержать полные пути к файлам программ,
+# но могут быть не определены или содержать только имена программ.
+# Добавьте дополнительные переменные в комплект, если это
+# необходимо для вашего сайта и ваших пользователей.
+
+validate "EDITOR" $EDITOR
+validate "MAILER" $MAILER
+validate "PAGER" $PAGER
+
+# И в заключение вывод разных сообщений, в зависимости от значения errors
+
+if [ $errors -gt 0 ] ; then
+    echo "Errors encountered. Please notify sysadmin for help."
+else
+    echo "Your environment checks out fine."
+fi
+
+exit 0
+
