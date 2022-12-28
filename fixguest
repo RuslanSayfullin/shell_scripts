@@ -1,0 +1,32 @@
+#!/bin/bash
+
+# fixguest -- очищает гостевую учетную запись в процессе выхода.
+
+# Не доверяйте переменным окружения: ссылайтесь на источники,
+# доступные только для чтения.
+iam=$(id -un)
+myhome="$(grep "^${iam}:" /etc/passwd | cut -d: -f6)"
+
+# *** НЕ запускайте этот сценарий в обычной учетной записи!
+
+if [ "$iam" != "guest" ] ; then
+    echo "Error: you really don't want to run fixguest on this account." >&2
+exit 1
+fi
+
+if [ ! -d $myhome/..template ] ; then
+    echo "$0: no template directory found for rebuilding." >&2
+    exit 1
+fi
+
+# Удалить все файлы и каталоги в домашнем каталоге учетной записи.
+
+cd $myhome
+
+rm -rf * $(find . -name ".[a-zA-Z0-9]*" -print)
+
+# Теперь должен остаться только каталог ..template.
+
+cp -Rp ..template/* .
+
+exit 0
