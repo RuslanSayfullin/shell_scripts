@@ -1,0 +1,47 @@
+#!/bin/bash
+# setdate -- дружественный интерфейс к команде date.
+# Команда date предлагает формат ввода: [[[[[cc]yy]mm]dd]hh]mm[.ss]
+
+# Чтобы обеспечить максимум удобств, эта функция просит ввести конкретную
+# дату, показывая значение по умолчанию в квадратных скобках [], исходя
+# из текущей даты и времени.
+
+. library.sh # Source our library of bash functions to get echon().
+
+askvalue()
+{
+    # $1 = имя поля, $2 = значение по умолчанию, $3 = максимальное значение,
+    # $4 = требуемая длина в символах/цифрах
+
+    echon "$1 [$2] : "
+    read answer
+
+    if [ ${answer:=$2} -gt $3 ] ; then
+        echo "$0: $1 $answer is invalid"
+        exit 0
+    elif [ "$(( $(echo $answer | wc -c) - 1 ))" -lt $4 ] ; then
+        echo "$0: $1 $answer is too short: please specify $4 digits"
+        exit 0
+    fi
+    eval $1=$answer # Загрузить в заданную переменную указанное значение.
+}
+
+eval $(date "+nyear=%Y nmon=%m nday=%d nhr=%H nmin=%M")
+
+askvalue year $nyear 3000 4
+askvalue month $nmon 12 2
+askvalue day $nday 31 2
+askvalue hour $nhr 24 2
+askvalue minute $nmin 59 2
+
+squished="$year$month$day$hour$minute"
+
+# Или, если сценарий предполагается использовать в Linux:
+# squished="$month$day$hour$minute$year"
+# Да, в системах Linux и OS X/BSD используются разные форматы.
+# Так лучше?
+
+echo "Setting date to $squished. You might need to enter your sudo password:"
+sudo date $squished
+exit 0
+
