@@ -1,0 +1,167 @@
+#!/bin/bash
+# verifycron -- проверяет правильность оформления файла crontab.
+# За основу принята стандартная нотация cron: min hr dom mon dow CMD,
+# где min -- числа 0-59, hr -- числа 0-23, dom -- числа 1-31,
+# mon -- числа 1-12 (или названия) и dow -- числа 0-7 (или названия).
+# Поля могут содержать диапазоны (a-e), списки значений, разделенных
+# запятыми (a,c,z), или звездочку. Обратите внимание, что форма определения
+# диапазона с шагом, допустимая в Vixie cron (например, 2-6/2),
+# не поддерживается текущей версией этого сценария.
+
+validNum()
+{
+    # Возвращает 0, если аргумент содержит допустимое целое число,
+    # и 1 -- если нет. Функция принимает само число и максимально
+    # возможное значение.
+    num=$1
+    max=$2
+
+    # Для простоты звездочки в полях представляются символами "X",
+    # то есть любое число в форме "X" по умолчанию считается допустимым.
+    if [ "$num" = "X" ] ; then
+        return 0
+    elif [ ! -z $(echo $num | sed 's/[[:digit:]]//g') ] ; then
+        # Отбросить все цифры и проверить остаток. Не пустой? Плохо.
+        return 1
+    elif [ $num -gt $max ] ; then
+        # Числа больше максимального значения недопустимы.
+        return 1
+    else
+        return 0
+    fi
+}
+
+validDay()
+{
+    # Возвращает 0, если аргумент содержит допустимое название дня недели;
+    # 1 -- если нет.
+    case $(echo $1 | tr '[:upper:]' '[:lower:]') in
+        sun*|mon*|tue*|wed*|thu*|fri*|sat*) return 0 ;;
+        X) return 0 ;; # Особый случай, это замена "*"
+        *) return 1
+    esac
+}
+
+validMon()
+{
+    # Возвращает 0, если аргумент содержит допустимое название месяца;
+    # 1 -- если нет.
+
+    case $(echo $1 | tr '[:upper:]' '[:lower:]') in
+        jan*|feb*|mar*|apr*|may|jun*|jul*|aug*) return 0 ;;
+        sep*|oct*|nov*|dec*)                    return 0 ;;
+        X) return 0 ;; # Особый случай, это замена "*"
+        *) return 1 ;;
+    esac
+}
+
+fixvars()
+{
+    # Преобразует все '*' в 'X', чтобы обойти конфликт с механизмом
+    # подстановки в командной оболочке. Оригинал сохраняется
+    # в "sourceline" для включения в сообщение об ошибке.
+
+    sourceline="$min $hour $dom $mon $dow $command"
+    min=$(echo "$min" | tr '*' 'X')    # Минуты
+    hour=$(echo "$hour" | tr '*' 'X')  # Часы
+    dom=$(echo "$dom" | tr '*' 'X')    # День месяца
+    mon=$(echo "$mon" | tr '*' 'X')    # Месяц
+    dow=$(echo "$dow" | tr '*' 'X')    # День недели
+}
+
+if [ $# -ne 1 ] || [ ! -r $1 ] ; then
+    # Если имя файла crontab не задано или если он недоступен сценарию
+    # для чтения, завершить работу с выводом сообщения.
+    echo "Usage: $0 usercrontabfile" >&2
+    exit 1
+fi
+
+lines=0 entries=0 totalerrors=0
+
+# Выполнить обход строк в файле crontab и проверить каждую в отдельности.
+
+while read min hour dom mon dow command
+do
+    lines="$(( $lines + 1 ))"
+    errors=0
+
+    if [ -z "$min" -o "${min%${min#?}}" = "#" ] ; then
+        # Если это пустая строка или начинается с символа "#", пропустить ее.
+        continue # Ничего проверять не надо
+    fi
+    
+    ((entries++))
+
+    fixvars
+
+    # В этой точке все поля в текущей строке перенесены в отдельные
+    # переменные, все звездочки заменены символом "X" для удобства,
+    # поэтому можно приступать к проверке полей...
+
+    # Проверка минут
+
+    for minslice in $(echo "$min" | sed 's/[,-]/ /g') ; do
+        if ! validNum $minslice 60 ; then
+            echo "Line ${lines}: Invalid minute value \"$minslice\""
+            errors=1
+        fi
+    done
+
+    # Проверка часов
+    for hrslice in $(echo "$hour" | sed 's/[,-]/ /g') ; do
+        if ! validNum $hrslice 24 ; then
+            echo "Line ${lines}: Invalid hour value \"$hrslice\""
+            errors=1
+        fi
+    done
+
+    # Проверка дня месяца
+    for domslice in $(echo $dom | sed 's/[,-]/ /g') ; do
+        if ! validNum $domslice 31 ; then
+            echo "Line ${lines}: Invalid day of month value \"$domslice\""
+            errors=1
+        fi
+    done
+
+    # Проверка месяца: нужно проверить числовые значения и названия.
+    # Запомните, что условные инструкции вида "if ! cond" проверяют
+    # ЛОЖНОСТЬ утверждения, а не истинность.
+
+    for monslice in $(echo "$mon" | sed 's/[,-]/ /g') ; do
+        if ! validNum $monslice 12 ; then
+            if ! validMon "$monslice" ; then
+                echo "Line ${lines}: Invalid month value \"$monslice\""
+                errors=1
+            fi
+        fi
+    done
+
+    # Проверка дня недели: так же может быть числом или названием.
+
+    for dowslice in $(echo "$dow" | sed 's/[,-]/ /g') ; do
+        if ! validNum $dowslice 7 ; then
+            if ! validDay $dowslice ; then
+                echo "Line ${lines}: Invalid day of week value \"$dowslice\""
+                errors=1
+            fi
+        fi
+    done 
+
+    if [ $errors -gt 0 ] ; then
+        echo ">>>> ${lines}: $sourceline"
+        echo ""
+        totalerrors="$(( $totalerrors + 1 ))"
+    fi
+done < $1 # читать файл crontab, имя которого передано
+          # сценарию в виде аргумента
+
+
+# Обратите внимание: в самом конце цикла while выполняется перенаправление
+# ввода, чтобы сценарий мог исследовать файл с именем, указанным
+# пользователем!
+
+echo "Done. Found $totalerrors errors in $entries crontab entries."
+
+exit 0
+
+
