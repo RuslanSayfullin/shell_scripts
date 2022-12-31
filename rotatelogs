@@ -1,0 +1,110 @@
+#!/bin/bash
+# rotatelogs -- выполняет ротацию файлов журналов в /var/log с целью
+# архивирования и чтобы предотвратить чрезмерное увеличение файлов
+# в размерах. Этот сценарий использует файл конфигурации, в котором
+# можно настроить период ротации каждого файла. Записи в конфигурационном
+# файле имеют формат logfilename=duration, где duration определяет
+# количество дней. Если запись в конфигурационном файле для журнала
+# logfilename отсутствует, rotatelogs будет выполнять ротацию такого
+# журнала с частотой раз в семь дней. Если для журнала установлена
+# продолжительность периода ротации, равная нулю, этот журнал будет
+# игнорироваться сценарием.
+
+logdir="/var/log"    # У вас журналы могут находиться в другом каталоге.
+config="$logdir/rotatelogs.conf"
+mv="/bin/mv"
+default_duration=7   # По умолчанию ротация выполняется через 7 дней.
+count=0
+
+duration=$default_duration
+
+if [ ! -f $config ] ; then
+    # Файл конфигурации отсутствует? Выйти. Эту проверку можно убрать
+    # и в отсутствие конфигурационного файла просто использовать настройки
+    # по умолчанию.
+    echo "$0: no config file found. Can't proceed." >&2
+    exit 1
+fi
+
+if [ ! -w $logdir -o ! -x $logdir ] ; then
+    # -w -- право на запись, а -x -- право на выполнение. Для создания
+    # новых файлов в каталогах Unix или Linux необходимы оба. Если
+    # права отсутствуют, завершить выполнение с выводом сообщения.
+    echo "$0: you don't have the appropriate permissions in $logdir" >&2
+    exit 1
+fi
+
+cd $logdir
+# Как бы нам ни хотелось использовать в команде find стандартные обозначения,
+# такие как :digit:, многие версии find не поддерживают POSIX-совместимые
+# классы символов -- поэтому [0-9].
+
+# Замысловатая команда find подробно обсуждается далее в этом разделе.
+# Не пропустите, если вам интересно!
+
+for name in $(ind . -maxdepth 1 -type f -size +0c ! -name '*[0-9]*' \
+    ! -name '\.*' ! -name '*conf' -print | sed 's/^\.\///')
+do
+
+    count=$(( $count + 1 ))
+    # Извлечь соответствующую запись из конфигурационного файла.
+    duration="$(grep "^${name}=" $config|cut -d= -f2)"
+
+    if [ -z "$duration" ] ; then
+        duration=$default_duration # Если совпадений нет, использовать период
+                                   по умолчанию.
+
+    elif [ "$duration" = "0" ] ; then
+        echo "Duration set to zero: skipping $name"
+        continue
+    fi
+
+
+    # Подготовить имена файлов для ротации. Это просто:
+    back1="${name}.1"; back2="${name}.2";
+    back3="${name}.3"; back4="${name}.4";
+
+    # Если самый свежий архив журнала (back1) изменялся не позднее
+    # заданного промежутка, значит, время ротации еще не подошло. Это
+    # можно определить командой find с флагом -mtime.
+    
+
+    if [ -f "$back1" ] ; then
+        if [ -z "$(find \"$back1\" -mtime +$duration -print 2>/dev/null)" ]
+        then
+            /bin/echo -n "$name's most recent backup is more recent than $duration "
+            echo "days: skipping" ; continue
+    fi
+fi    
+
+echo "Rotating log $name (using a $duration day schedule)"
+
+# Ротация начинается с самого старого архива, но будьте осторожны,
+# так как некоторые файлы могут просто отсутствовать.
+
+if [ -f "$back3" ] ; then
+    echo "... $back3 -> $back4" ; $mv -f "$back3" "$back4"
+fi
+if [ -f "$back2" ] ; then
+    echo "... $back2 -> $back3" ; $mv -f "$back2" "$back3"
+fi
+
+if [ -f "$back1" ] ; then
+    echo "... $back1 -> $back2" ; $mv -f "$back1" "$back2"
+fi
+
+    if [ -f "$name" ] ; then
+        echo "... $name -> $back1" ; $mv -f "$name" "$back1"
+    fi
+    touch "$name"
+    chmod 0600 "$name" # Последний шаг: изменить права файла на rw-------
+                        для безопасности 
+done
+
+if [ $count -eq 0 ] ; then
+    echo "Nothing to do: no log files big enough or old enough to rotate"
+fi
+
+exit 0
+
+  
