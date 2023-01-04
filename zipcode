@@ -1,0 +1,13 @@
+#!/bin/bash
+# zipcode -- получая почтовый индекс, определяет город и штат в США.
+# Использует сайт city-data.com, в котором для каждого почтового
+# индекса отводится своя веб-страница.
+
+baseURL="http://www.city-data.com/zips"
+/bin/echo -n "ZIP code $1 is in "
+
+curl -s -dump "$baseURL/$1.html" | \
+    grep -i '<title>' | \
+    cut -d\( -f2 | cut -d\) -f1
+exit 0
+
