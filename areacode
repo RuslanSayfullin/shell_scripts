@@ -1,0 +1,34 @@
+#!/bin/bash
+
+# areacode -- получая трехзначный телефонный код, действующий в США,
+# определяет город и штат по данным в простой табличной форме, на
+# веб-сайте Беннета Йи (Bennet Yee).
+
+source="http://www.bennetyee.org/ucsd-pages/area.html"
+
+if [ -z "$1" ] ; then
+    echo "usage: areacode <three-digit US telephone area code>"
+    exit 1
+fi
+
+# wc -c вернет количество символов + символ перевода строки,
+# то есть для 3 цифр = 4 символа
+if [ "$(echo $1 | wc -c)" -ne 4 ] ; then
+    echo "areacode: wrong length: only works with three-digit US area codes"
+    exit 1
+fi
+
+# Все символы -- цифры?
+if [ ! -z "$(echo $1 | sed 's/[[:digit:]]//g')" ] ; then
+    echo "areacode: not-digits: area codes can only be made up of digits"
+    exit 1
+fi
+
+# Теперь можно выполнить поиск по телефонному коду...
+result="$(curl -s -dump $source | grep "name=\"$1" | \
+    sed 's/<[^>]*>//g;s/^ //g' | \
+    cut -f2- -d\ | cut -f1 -d\( )"
+
+echo "Area code $1 =$result"
+
+exit 0
