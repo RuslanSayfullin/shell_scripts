@@ -1,0 +1,55 @@
+#!/bin/bash
+# convertcurrency -- принимая сумму и базовую валюту, пересчитывает эту
+# сумму в другой валюте. Для обозначения валют используются идентификаторы
+# ISO. Для фактических вычислений использует валютный калькулятор Google:
+# http://www.google.com/finance/converter
+
+if [ $# -eq 0 ]; then
+    echo "Usage: $(basename $0) amount currency to currency"
+    echo "Most common currencies are CAD, CNY, EUR, USD, INR, JPY, and MXN"
+    echo "Use \"$(basename $0) list\" for a list of supported currencies."
+fi
+
+if [ $(uname) = "Darwin" ]; then
+    LANG=C # Для решения проблемы в OS X с ошибочными последовательностями
+           # байтов и lynx
+fi
+
+url="https://www.google.com/finance/converter"
+tempfile="/tmp/converter.$$"
+
+lynx=$(which lynx)
+# Так как эти данные используются многократно, извлечем их,
+# а потом займемся всем остальным.
+
+currencies=$($lynx -source "$url" | grep "option value=" | \
+    cut -d\" -f2- | sed 's/">/ /' | cut -d\( -f1 | sort | uniq)
+
+########### Выполнить все запросы, не связанные с пересчетом.
+if [ $# -ne 4 ] ; then
+    if [ "$1" = "list" ] ; then
+        # Вывести список всех символов валют, известных калькулятору.
+        echo "List of supported currencies:"
+        echo "$currencies"
+    fi
+    exit 0
+fi
+
+########### Теперь выполним пересчет.
+
+if [ $3 != "to" ] ; then
+    echo "Usage: $(basename $0) value currency TO currency"
+    echo "(use \"$(basename $0) list\" to get a list of all currency values)"
+    exit 0
+fi
+
+amount=$1
+basecurrency="$(echo $2 | tr '[:lower:]' '[:upper:]')"
+targetcurrency="$(echo $4 | tr '[:lower:]' '[:upper:]')"
+
+# Наконец, фактический вызов калькулятора!
+
+$lynx -source "$url?a=$amount&from=$basecurrency&to=$targetcurrency" | \
+    grep 'id=currency_converter_result' | sed 's/<[^>]*>//g'
+
+exit 0
