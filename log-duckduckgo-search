@@ -1,0 +1,22 @@
+#!/bin/bash
+
+# log-duckduckgo-search -- получив поисковый запрос, регистрирует шаблон поиска
+# и затем передает всю последовательность поисковой системе DuckDuckGo
+# Каталог и файл, указанные в logfile, должны быть доступны для записи
+#
+пользователю, с привилегиями которого выполняется веб-сервер.
+logfile="/var/www/wicked/scripts/searchlog.txt"
+
+if [ ! -f $logfile ] ; then
+    touch $logfile
+    chmod a+rw $logfile
+fi
+
+if [ -w $logfile ] ; then
+    echo "$(date): QUERY_STRING" | sed 's/q=//g;s/+/ /g' >> $logfile
+fi
+
+echo "Location: https://duckduckgo.com/html/?$QUERY_STRING"
+echo ""
+
+exit 0
