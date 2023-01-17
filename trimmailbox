@@ -1,0 +1,22 @@
+#!/bin/bash
+# trimmailbox -- простой сценарий, гарантирующий сохранность только четырех
+# последних сообщений в почтовом ящике пользователя. Предполагает
+# использование реализации Berkeley Mail (Mailx bkb mail) -- требует
+# модификации для других почтовых систем!
+
+keep=4 # По умолчанию сохраняет только четыре последних сообщения.
+
+totalmsgs="$(echo 'x' | mail | sed -n '2p' | awk '{print $2}')"
+
+if [ $totalmsgs -lt $keep ] ; then
+    exit 0    # Ничего делать не надо.
+fi
+
+topmsg="$(( $totalmsgs - $keep ))"
+
+mail > /dev/null << EOF
+d1-$topmsg
+q
+EOF
+
+exit 0

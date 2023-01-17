@@ -1,0 +1,49 @@
+#!/bin/bash
+# remotebackup -- принимает список файлов и каталогов, создает единый
+# сжатый архив и отправляет его по электронной почте на удаленный сайт
+# для сохранения. Может запускаться по ночам для сохранения важных
+# пользовательских файлов, но не может служить заменой более строгой
+# системы резервного копирования.
+
+outfile="/tmp/rb.$$.tgz"
+outfname="backup.$(date +%y%m%d).tgz"
+infile="/tmp/rb.$$.in"
+
+trap "$(which rm) -f $outfile $infile" 0
+
+if [ $# -ne 2 -a $# -ne 3 ] ; then
+    echo "Usage: $(basename $0) backup-file-list remoteaddr {targetdir}" >&2
+    exit 1
+fi
+
+if [ ! -s "$1" ] ; then
+    echo "Error: backup list $1 is empty or missing" >&2
+    exit 1
+fi
+
+# Сканировать записи и создать фиксированный список в файле infile.
+# В ходе этой операции выполняются экранирование пробелов и подстановка
+# шаблонных символов в именах файлов, то есть имя файла "this file"
+# превращается в this\ file, что избавляет от необходимости использовать
+# кавычки.
+
+while read entry; do
+    echo "$entry" | sed -e 's/ /\\ /g' >> $infile
+done < "$1"
+
+# Фактическое создание архива, его кодирование и отправка.
+tar czf - $(cat $infile) | \
+    uuencode $outfname | \
+    mail -s "${3:-Backup archive for $(date)}" "$2"
+
+echo "Done. $(basename $0) backed up the following files:"
+sed 's/^/ /' $infile
+/bin/echo -n "and mailed them to $2 "
+
+if [ ! -z "$3" ] ; then
+    echo "with requested target directory $3"
+else
+    echo ""
+fi
+
+exit 0
