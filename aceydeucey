@@ -1,0 +1,220 @@
+#!/bin/bash
+# aceyduecey: Дилер выкладывает две карты, и вы должны угадать, попадает ли
+# числовое значение следующей карты в колоде между значениями этих двух
+# карт. Например, выпали 6 и 8, если следующая карта окажется 7, вы выиграли
+# если 9 -- проиграли.
+function initializeDeck
+
+{
+    # Создать колоду карт.
+
+    card=1
+    while [ $card –le 52 ] # 52 карты в колоде. Вы это знаете, правда?
+    do
+        deck[$card]=$card
+        card=$(( $card + 1 ))
+    done
+}
+
+function shuffleDeck
+{
+    # Это не настоящее перемешивание. Это случайное извлечение значений карт
+    # из массива 'deck' и создание массива newdeck[], представляющего
+    # "перемешанную" колоду.
+    count=1
+
+    while [ $count != 53 ]
+    do
+        pickCard
+        newdeck[$count]=$picked
+        count=$(( $count + 1 ))
+    done
+}
+
+function pickCard
+{
+    # Это самая интересная функция: выбор случайной карты из колоды.
+    # Поиск карты осуществляется в массиве deck[].
+
+    local errcount randomcard
+
+    threshold=10 # Максимальное число попыток, прежде чем признать неудачу
+    errcount=0
+
+    # Выбирает из колоды случайную карту, которая еще не была выбрана,
+    # выполняя не более $threshold попыток. В случае неудачи (чтобы
+    # избежать зацикливания, когда раз за разом выполняется попытка
+    # извлечь уже извлеченную карту) выполняется переход к запасному
+    # варианту.
+
+    while [ $errcount -lt $threshold ]
+    do
+        randomcard=$(( ( $RANDOM % 52 ) + 1 ))
+        errcount=$(( $errcount + 1 ))
+        
+        if [ ${deck[$randomcard]} -ne 0 ] ; then
+            picked=${deck[$randomcard]}
+            deck[$picked]=0 # Выбрали -- удалить ее.
+            return $picked
+        fi
+    done
+
+    # Если сценарий оказался здесь, значит, он не смог выбрать случайную карту,
+    # поэтому дальше просто продолжается последовательный обход массива
+    # до обнаружения первой доступной карты.
+
+    randomcard=1
+    while [ ${newdeck[$randomcard]} -eq 0 ]
+    do
+        randomcard=$(( $randomcard + 1 ))
+    done
+    
+    picked=$randomcard
+    deck[$picked]=0 # Выбрали -- удалить ее.
+    return $picked
+}
+
+function showCard
+{
+    # Функция использует операции деления и взятия остатка для определения
+    # масти и достоинства, хотя в этой игре значение имеет только достоинство.
+    # Однако для представления важно иметь полную информацию.
+    
+    card=$1
+    if [ $card -lt 1 -o $card -gt 52 ] ; then
+        echo "Bad card value: $card"
+        exit 1
+    fi
+
+    # деление и взятие остатка -- школьные годы не были потрачены впустую!
+    suit="$(( ( ( $card - 1) / 13 ) + 1))"
+    rank="$(( $card % 13))"
+
+    case $suit in
+        1 ) suit="Hearts"   ;;
+        2 ) suit="Clubs"    ;;
+        3 ) suit="Spades"   ;;
+        4 ) suit="Diamonds" ;;
+        * ) echo "Bad suit value: $suit"
+            exit 1
+    esac
+
+    case $rank in
+        0 ) rank="King" ;;
+        1 ) rank="Ace"  ;;
+        11) rank="Jack" ;;
+        12) rank="Queen";;
+    esac
+
+    cardname="$rank of $suit"
+}
+
+function dealCards
+{
+    # В игре Раз-два раздаются две карты...
+
+    card1=${newdeck[1]} # Колода перетасована, поэтому
+    card2=${newdeck[2]} # выдаем две верхних карты
+    card3=${newdeck[3]} # и снимаем третью, но пока не показываем.
+
+    rank1=$(( ${newdeck[1]} % 13 )) # И сразу определяем достоинства, чтобы
+    rank2=$(( ${newdeck[2]} % 13 )) # упростить последующие вычисления.
+    rank3=$(( ${newdeck[3]} % 13 )) 
+
+    # Исправить значение для короля: по умолчанию оно равно 0,
+    # сделать равным 13.
+
+    if [ $rank1 -eq 0 ] ; then
+        rank1=13;
+    fi
+
+    if [ $rank2 -eq 0 ] ; then
+        rank2=13;
+    fi
+    
+    if [ $rank3 -eq 0 ] ; then
+        rank3=13;
+    fi
+
+    # Теперь поменяем сданные карты местами так, чтобы card1 всегда
+    # была меньше card2.
+
+    if [ $rank1 -gt $rank2 ] ; then
+        temp=$card1; card1=$card2; card2=$temp
+        temp=$rank1; rank1=$rank2; rank2=$temp
+    fi
+
+
+    showCard $card1 ; cardname1=$cardname
+    showCard $card2 ; cardname2=$cardname
+
+    showCard $card3 ; cardname3=$cardname # Shhh, it's a secret for now.
+
+    echo "I've dealt:" ; echo " $cardname1" ; echo " $cardname2"
+}
+
+function introblurb
+{
+    cat << EOF
+Welcome to Acey Deucey. The goal of this game is for you to correctly guess
+whether the third card is going to be between the two cards I'll pull from
+the deck. For example, if I flip up a 5 of hearts and a jack of diamonds,
+you'd bet on whether the next card will have a higher rank than a 5 AND a
+lower rank than a jack (that is, a 6, 7, 8, 9, or 10 of any suit).
+Ready? Let's go!
+
+EOF
+}
+
+games=0
+won=0
+
+if [ $# -gt 0 ] ; then # Полезная информация, если параметр определен
+    introblurb
+fi
+
+while [ /bin/true ] ; do
+    initializeDeck
+    shuffleDeck
+    dealCards
+    splitValue=$(( $rank2 - $rank1 ))
+
+    if [ $splitValue -eq 0 ] ; then
+        echo "No point in betting when they're the same rank!"
+        continue
+    fi
+
+    /bin/echo -n "The spread is $splitValue. Do you think the next card will "
+    /bin/echo -n "be between them? (y/n/q) "
+    read answer
+    if [ "$answer" = "q" ] ; then
+        echo ""
+        echo "You played $games games and won $won times."
+        exit 0
+    fi
+
+    echo "I picked: $cardname3"
+
+    # Третья карта попадает между первыми двумя? Проверим.
+    # Помните, равные значения = проигрыш.
+
+    if [ $rank3 -gt $rank1 -a $rank3 -lt $rank2 ] ; then # Выигрыш!
+        winner=1
+    else
+        winner=0
+    fi
+
+    if [ $winner -eq 1 -a "$answer" = "y" ] ; then
+        echo "You bet that it would be between the two, and it is. WIN!"
+        won=$(( $won + 1 ))
+    elif [ $winner -eq 0 -a "$answer" = "n" ] ; then
+        echo "You bet that it would not be between the two, and it isn't. WIN!"
+        won=$(( $won + 1 ))
+    else
+        echo "Bad betting strategy. You lose."
+    fi
+
+    games=$(( $games + 1 )) # How many times do you play?
+done
+exit 0
+
