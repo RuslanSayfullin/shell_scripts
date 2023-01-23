@@ -1,0 +1,9 @@
+#!/bin/bash
+# imagesize -- выводит информацию о файле изображения и определяет размеры,
+# используя утилиту identify из пакета ImageMagick.
+
+for name
+do
+    identify -format "%f: %G with %k colors.\n" "$name"
+done
+exit 0
