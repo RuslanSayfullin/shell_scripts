@@ -1,0 +1,37 @@
+#!/bin/bash
+# syncgdrive -- позволяет указать один или несколько файлов, чтобы
+# автоматически скопировать их в вашу папку Google Drive, которая
+# синхронизируется с вашей учетной записью в облаке.
+
+
+gdrive="$HOME/Google Drive"
+gsync="$gdrive/gsync"
+gapp="Google Drive.app"
+
+if [ $# -eq 0 ] ; then
+    echo "Usage: $(basename $0) [file or files to sync]" >&2
+    exit 1
+fi
+
+# Проверить, запущен ли Google Drive? Если нет, запустить.
+if [ -z "$(ps -ef | grep "$gapp" | grep -v grep)" ] ; then
+    echo "Starting up Google Drive daemon..."
+    open -a "$gapp"
+fi
+
+# Теперь проверить наличие папки /gsync.
+if [ ! -d "$gsync" ] ; then
+    mkdir "$gsync"
+    if [ $? -ne 0 ] ; then
+        echo "$(basename $0): Failed trying to mkdir $gsync" >&2
+        exit 1
+    fi
+fi
+
+for name    # Цикл по аргументам сценария.
+do
+    echo "Copying file $name to your Google Drive"
+    cp -a "$name" "$gdrive/gsync/"
+done
+
+exit 0
