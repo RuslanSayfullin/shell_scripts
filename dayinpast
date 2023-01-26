@@ -19,16 +19,16 @@ else
         pattern="$2[^0-9]"
     fi
     
-    dayofweek="$(ncal $1 $3 | grep "$pattern" | cut -c1-2)"
+    dayofweek="$(ncal $1 $3 | grep "$pattern" | cut -c1-2)"
 
     case $dayofweek in
-        Su ) echo "That was a Sunday.";   ;;
-        Mo ) echo "That was a Monday.";   ;;
-        Tu ) echo "That was a Tuesday.";  ;;
-        We ) echo "That was a Wednesday.";;;
-        Th ) echo "That was a Thursday."; ;;
-        Fr ) echo "That was a Friday.";   ;;
-        Sa ) echo "That was a Saturday."; ;;
+        Su ) echo "That was a Sunday.";    ;;
+        Mo ) echo "That was a Monday.";    ;;
+        Tu ) echo "That was a Tuesday.";   ;;
+        We ) echo "That was a Wednesday."; ;;
+        Th ) echo "That was a Thursday.";  ;;
+        Fr ) echo "That was a Friday.";    ;;
+        Sa ) echo "That was a Saturday.";  ;;
     esac
 fi
 
